@@ -12,6 +12,7 @@ import { AIEfficiencyTab } from "@/components/AIEfficiencyTab";
 import { AIAdvisor } from "@/components/AIAdvisor";
 import type { PredictionResponse } from "@/types/predictions";
 
+
 // Default parameters for the simulation
 const defaultParameters: HydraulicParameters = {
   cylinderBore: 75,
