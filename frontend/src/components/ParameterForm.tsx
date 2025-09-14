@@ -4,6 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { HydraulicParameters } from "./HydraulicSimulator";
 
+
 interface ParameterFormProps {
   parameters: HydraulicParameters;
   onParametersChange: (parameters: HydraulicParameters) => void;
@@ -14,12 +15,12 @@ export const ParameterForm = ({ parameters, onParametersChange }: ParameterFormP
     const newParams = { ...parameters };
     const keys = path.split('.');
     let current: any = newParams;
-    
+
     for (let i = 0; i < keys.length - 1; i++) {
       current = current[keys[i]];
     }
     current[keys[keys.length - 1]] = value;
-    
+
     onParametersChange(newParams);
   };
 
@@ -53,7 +54,7 @@ export const ParameterForm = ({ parameters, onParametersChange }: ParameterFormP
               />
             </div>
           </div>
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="deadLoad" className="text-sm font-medium">Dead Load (Ton)</Label>
@@ -77,9 +78,32 @@ export const ParameterForm = ({ parameters, onParametersChange }: ParameterFormP
               />
             </div>
           </div>
-          
+
+          <div>
+            <Label htmlFor="strokeLength" className="text-sm font-medium">Stroke Length (mm)</Label>
+            <Input
+              id="strokeLength"
+              type="number"
+              value={parameters.strokeLength}
+              onChange={(e) => updateParameter('strokeLength', Number(e.target.value))}
+              className="mt-1"
+            />
+          </div>
+
+          {/* <div className="grid w-full items-center gap-1.5">
+            <Label htmlFor="strokeLength">Stroke Length (mm)</Label>
+            <Input
+              type="number"
+              id="strokeLength"
+              name="strokeLength"
+              value={parameters.strokeLength}
+              onChange={(e) => updateParameter('strokeLength', Number(e.target.value))
+            //onChange={yourHandleChangeFunction} // Use your existing change handler
+            />
+          </div> */}
+
           <Separator />
-          
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label htmlFor="motorRpm" className="text-sm font-medium">Motor Speed (RPM)</Label>
@@ -105,16 +129,29 @@ export const ParameterForm = ({ parameters, onParametersChange }: ParameterFormP
               />
             </div>
           </div>
-          
-          <div>
-            <Label htmlFor="systemLosses" className="text-sm font-medium">System Losses (bar)</Label>
-            <Input
-              id="systemLosses"
-              type="number"
-              value={parameters.systemLosses}
-              onChange={(e) => updateParameter('systemLosses', Number(e.target.value))}
-              className="mt-1"
-            />
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="systemLosses" className="text-sm font-medium">System Losses (bar)</Label>
+              <Input
+                id="systemLosses"
+                type="number"
+                value={parameters.systemLosses}
+                onChange={(e) => updateParameter('systemLosses', Number(e.target.value))}
+                className="mt-1"
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="pumpMeanFlowRate" className="text-sm font-medium">Pump Mean Flow Rate</Label>
+              <Input
+                id="pumpMeanFlowRate"
+                type="number"
+                value={parameters.pumpMeanFlowRate}
+                onChange={(e) => updateParameter('pumpMeanFlowRate', Number(e.target.value))}
+                className="mt-1"
+              />
+            </div>
           </div>
         </CardContent>
       </Card>

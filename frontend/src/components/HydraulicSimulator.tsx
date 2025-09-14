@@ -14,6 +14,7 @@ import type { PredictionResponse } from "@/types/predictions";
 import { CompareView } from "@/components/CompareView";
 import type { EnhancedSensorData } from "@/types/hydraulicData";
 
+
 // --- MODIFIED --- We only need these three for the export
 import { svgAsPngUri } from 'save-svg-as-png';
 import { usePDF } from '@react-pdf/renderer';
@@ -28,6 +29,9 @@ const defaultParameters: HydraulicParameters = {
   motorRpm: 1800,
   pumpEfficiency: 0.9,
   systemLosses: 10,
+  strokeLength: 250,
+  pumpMeanFlowRate: 53,
+  fluidType: "ISO VG 46", 
   phases: {
     fastDown: { speed: 200, stroke: 200, time: 1 },
     workingCycle: { speed: 10, stroke: 50, time: 5 },
@@ -55,6 +59,14 @@ export interface ComparisonDataPoint {
   actualPower: number;
   powerError: number;
 }
+
+const handleFluidChange = (value: string) => {
+  setParameters(prevParams => ({
+    ...prevParams,
+    fluidType: value,
+  }));
+};
+
 
 // Sine easing function (unchanged)
 const easeInOutSine = (x: number): number => -(Math.cos(Math.PI * x) - 1) / 2;
@@ -228,7 +240,7 @@ export const HydraulicSimulator = () => {
             </div>
             <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 bg-primary/10 rounded-lg"><Calculator className="h-8 w-8 text-primary" /></div>
-                <div><h1 className="text-3xl font-bold text-foreground">Ideal vs. Actual Comparison</h1></div>
+                <div><h1 className="text-3xl font-bold text-foreground">Hydraulic Press Simulator</h1></div>
             </div>
             <div className="flex flex-col gap-4">
                 <div className="flex flex-wrap gap-4">

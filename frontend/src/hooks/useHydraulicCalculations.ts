@@ -78,10 +78,12 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
       
       const simulationDataPoints: SimulationDataPoint[] = [];
       const phases = [
+        { name: 'holding', time: parameters.phases.holding.time, pressure: pressureHolding, flow: flowHolding, motorPower: powerHoldingMotor, actuatorPower: 0, idealPower: 0 },
         { name: 'fastDown', time: parameters.phases.fastDown.time, pressure: pressureFastDown, flow: flowFastDown, motorPower: powerFastDownMotor, actuatorPower: actuatorPowerFastDown, idealPower: powerFastDownPump },
         { name: 'workingCycle', time: parameters.phases.workingCycle.time, pressure: pressureWorkingCycle, flow: flowWorkingCycle, motorPower: powerWorkingCycleMotor, actuatorPower: actuatorPowerWorking, idealPower: powerWorkingCyclePump },
         { name: 'holding', time: parameters.phases.holding.time, pressure: pressureHolding, flow: flowHolding, motorPower: powerHoldingMotor, actuatorPower: 0, idealPower: 0 },
-        { name: 'fastUp', time: parameters.phases.fastUp.time, pressure: pressureFastUp, flow: flowFastUp, motorPower: powerFastUpMotor, actuatorPower: actuatorPowerFastUp, idealPower: powerFastUpPump }
+        { name: 'fastUp', time: parameters.phases.fastUp.time, pressure: pressureFastUp, flow: flowFastUp, motorPower: powerFastUpMotor, actuatorPower: actuatorPowerFastUp, idealPower: powerFastUpPump },
+        { name: 'holding', time: parameters.phases.holding.time, pressure: pressureHolding, flow: flowHolding, motorPower: powerHoldingMotor, actuatorPower: 0, idealPower: 0 },
       ];
 
       let currentTime = 0;
@@ -114,7 +116,7 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
             stroke: Math.max(0, strokeAtTime),
             pressure_cap: phase.pressure - pressureVariation,
             pressure_rod: phase.pressure * 0.2,
-            velocity: (phase.name === 'fastUp' ? -1 : 1) * (phaseParams.speed / 1000) * (phase.name === 'holding' ? 0 : 1),
+            velocity: (phase.name === 'fastUp' ? -1 : 1) * (phaseParams.speed ) * (phase.name === 'holding' ? 0 : 1),
             motorPower: phase.motorPower, 
             actuatorPower: phase.actuatorPower,
             phase: phase.name.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase()),

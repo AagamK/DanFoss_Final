@@ -32,7 +32,7 @@ const getUnit = (dataKey: string) => {
     case 'pressure_cap': return 'bar';
     case 'pressure_rod': return 'bar';
     case 'stroke': return 'mm';
-    case 'velocity': return 'm/s';
+    case 'velocity': return 'mm/s';
     case 'idealMotorInputPower': return 'kW';
     case 'actualMotorInputPower': return 'kW';
     case 'actuatorOutputPower': return 'kW';
@@ -74,7 +74,7 @@ export const SimulationGraphs = ({ data, isLoading }: SimulationGraphsProps) => 
     <div className="grid grid-cols-1 gap-6">
       {/* 1. Time VS Displacement */}
       <Card id="displacement-graph">
-        <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp /> Time VS Displacement</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><TrendingUp /> Displacement VS Time</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={data}>
@@ -90,13 +90,13 @@ export const SimulationGraphs = ({ data, isLoading }: SimulationGraphsProps) => 
 
       {/* 2. Time VS Velocity */}
       <Card id="velocity-graph">
-        <CardHeader><CardTitle className="flex items-center gap-2"><Wind /> Time VS Velocity</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Wind />Velocity VS Time</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={data}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="time" type="number" domain={[0, 'dataMax']} ticks={xTicks} tickFormatter={(val) => val.toFixed(2)} unit="s" />
-              <YAxis label={{ value: 'Velocity (m/s)', angle: -90, position: 'insideLeft' }} />
+              <YAxis label={{ value: 'Velocity (mm/s)', angle: -90, position: 'insideLeft' }} />
               <Tooltip content={<CustomTooltip />} />
               <Line type="linear" dataKey="velocity" name="Velocity" stroke="#10b981" dot={false} />
             </LineChart>
@@ -106,7 +106,7 @@ export const SimulationGraphs = ({ data, isLoading }: SimulationGraphsProps) => 
 
       {/* 3. Time VS Pressure at cap end */}
       <Card id="pressure-cap-graph">
-        <CardHeader><CardTitle className="flex items-center gap-2"><Activity /> Time VS Pressure at Cap End</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Activity />Pressure VS Time</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={data}>
@@ -120,7 +120,7 @@ export const SimulationGraphs = ({ data, isLoading }: SimulationGraphsProps) => 
         </CardContent>
       </Card>
       
-      {/* 4. Time VS Pressure at rod end */}
+      {/* 4. Time VS Pressure at rod end
       <Card id="pressure-rod-graph">
         <CardHeader><CardTitle className="flex items-center gap-2"><Activity /> Time VS Pressure at Rod End</CardTitle></CardHeader>
         <CardContent>
@@ -134,11 +134,11 @@ export const SimulationGraphs = ({ data, isLoading }: SimulationGraphsProps) => 
             </LineChart>
           </ResponsiveContainer>
         </CardContent>
-      </Card>
+      </Card> */}
       
       {/* 5. Time VS Flow rate of pump */}
       <Card id="flow-rate-graph">
-        <CardHeader><CardTitle className="flex items-center gap-2"><Gauge /> Time VS Flow Rate of Pump</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Gauge />Flow Rate of Pump VS Time</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={data}>
@@ -154,7 +154,7 @@ export const SimulationGraphs = ({ data, isLoading }: SimulationGraphsProps) => 
 
       {/* 6. Power Analysis Graph (NEW) */}
       <Card id="power-analysis-graph">
-        <CardHeader><CardTitle className="flex items-center gap-2"><Zap /> Power Analysis</CardTitle></CardHeader>
+        <CardHeader><CardTitle className="flex items-center gap-2"><Zap /> Power Analysis VS Time</CardTitle></CardHeader>
         <CardContent>
           <ResponsiveContainer width="100%" height={300}>
             <LineChart data={data}>

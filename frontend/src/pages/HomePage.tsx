@@ -52,6 +52,26 @@ const HomePage = () => {
               </Button>
             </CardContent>
           </Card>
+
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 hover:border-secondary/20" onClick={() => navigate('/monitoring')}>
+            <CardHeader className="text-center">
+              <div className="mx-auto p-3 bg-secondary/10 rounded-full w-fit mb-4">
+                <Activity className="h-8 w-8 text-secondary" />
+              </div>
+              <CardTitle className="text-2xl">Hydraulic Simulator Calculator</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <p className="text-muted-foreground">
+
+              </p>
+              <Button className="w-full">
+                Calculator Data
+              </Button>
+            </CardContent>
+          </Card>
+
+
         </div>
       </div>
     </div>
