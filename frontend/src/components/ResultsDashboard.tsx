@@ -19,7 +19,23 @@ export interface HydraulicResults {
     fastUp: number;            // bar
   };
   motorPower: number;          // kW
-  maxReliefValve: number;      // bar
+  maxReliefValve: number; 
+  
+
+  overallEfficiencyOp: number;
+
+
+  energyeff:{
+    total: number;             // kWh per cycle
+    perPhase: {
+      fastDown: number;
+      workingCycle: number;
+      holding: number;
+      fastUp: number;
+    };
+  };
+  
+  // bar
   energyConsumption: {
     total: number;             // kWh per cycle
     perPhase: {
@@ -192,40 +208,80 @@ export const ResultsDashboard = ({ results, isCalculating }: ResultsDashboardPro
       </div>
 
       {/* Energy Consumption */}
-      <Card className="shadow-technical">
-        <CardHeader>
-          <CardTitle className="text-lg font-semibold flex items-center gap-2">
-            <Zap className="h-5 w-5 text-warning" />
-            Energy Consumption Analysis
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-            <div className="text-center p-4 bg-muted/50 rounded-lg">
-              <div className="text-2xl font-bold text-foreground">
-                {results.energyConsumption.total.toFixed(3)}
-              </div>
-              <div className="text-sm text-muted-foreground">kWh/cycle</div>
-              <div className="text-xs font-medium text-primary mt-1">Total</div>
-            </div>
-            
-            <Separator orientation="vertical" className="hidden md:block" />
-            
-            <div className="grid grid-cols-2 md:grid-cols-1 gap-2 md:col-span-3">
-              {Object.entries(results.energyConsumption.perPhase).map(([phase, energy]) => (
-                <div key={phase} className="flex justify-between items-center p-2 rounded bg-card">
-                  <span className="text-sm capitalize text-muted-foreground">
-                    {phase.replace(/([A-Z])/g, ' $1').toLowerCase()}
-                  </span>
-                  <span className="font-mono text-sm">
-                    {energy.toFixed(3)} kWh
-                  </span>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+
+        <Card className="shadow-technical">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Zap className="h-5 w-5 text-warning" />
+              Moter Energy Consumption
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="text-center p-4 bg-muted/50 rounded-lg">
+                <div className="text-2xl font-bold text-foreground">
+                  {results.energyConsumption.total.toFixed(3)}
                 </div>
-              ))}
+                <div className="text-sm text-muted-foreground">kJ / Cycle</div>
+                <div className="text-xs font-medium text-primary mt-1">Total</div>
+              </div>
+
+              {/* <Separator orientation="vertical" className="hidden md:block" /> */}
+
+              <div className="grid grid-cols-2 md:grid-cols-1 gap-2 md:col-span-3">
+                {Object.entries(results.energyConsumption.perPhase).map(([phase, energy]) => (
+                  <div key={phase} className="flex justify-between items-center p-2 rounded bg-card">
+                    <span className="text-sm capitalize text-muted-foreground">
+                      {phase.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                    </span>
+                    <span className="font-mono text-sm">
+                      {energy.toFixed(3)} kJ
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+
+
+        <Card className="shadow-technical">
+          <CardHeader>
+            <CardTitle className="text-lg font-semibold flex items-center gap-2">
+              <Zap className="h-5 w-5 text-warning" />
+              Moter Energy Efficiency
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+              <div className="text-center p-4 bg-muted/50 rounded-lg">
+                <div className="text-2xl font-bold text-foreground">
+                  {results.energyeff.total.toFixed(3)}
+                </div>
+                <div className="text-sm text-muted-foreground">% / Cycle</div>
+                <div className="text-xs font-medium text-primary mt-1">Total</div>
+              </div>
+
+              {/* <Separator orientation="vertical" className="hidden md:block" /> */}
+
+              <div className="grid grid-cols-2 md:grid-cols-1 gap-2 md:col-span-3">
+                {Object.entries(results.energyeff.perPhase).map(([phase, energy]) => (
+                  <div key={phase} className="flex justify-between items-center p-2 rounded bg-card">
+                    <span className="text-sm capitalize text-muted-foreground">
+                      {phase.replace(/([A-Z])/g, ' $1').toLowerCase()}
+                    </span>
+                    <span className="font-mono text-sm">
+                      {energy.toFixed(3)} %
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }

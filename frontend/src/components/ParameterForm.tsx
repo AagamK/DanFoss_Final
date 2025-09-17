@@ -141,17 +141,6 @@ export const ParameterForm = ({ parameters, onParametersChange }: ParameterFormP
                 className="mt-1"
               />
             </div>
-
-            <div>
-              <Label htmlFor="pumpMeanFlowRate" className="text-sm font-medium">Pump Mean Flow Rate</Label>
-              <Input
-                id="pumpMeanFlowRate"
-                type="number"
-                value={parameters.pumpMeanFlowRate}
-                onChange={(e) => updateParameter('pumpMeanFlowRate', Number(e.target.value))}
-                className="mt-1"
-              />
-            </div>
           </div>
         </CardContent>
       </Card>

@@ -54,7 +54,7 @@ const HomePage = () => {
           </Card>
 
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 hover:border-secondary/20" onClick={() => navigate('/monitoring')}>
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 hover:border-secondary/20" onClick={() => navigate('/calculator')}>
             <CardHeader className="text-center">
               <div className="mx-auto p-3 bg-secondary/10 rounded-full w-fit mb-4">
                 <Activity className="h-8 w-8 text-secondary" />

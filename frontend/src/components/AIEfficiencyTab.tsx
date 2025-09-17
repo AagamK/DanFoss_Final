@@ -28,8 +28,8 @@ export const AIEfficiencyTab = ({ simulationData, results, prediction }: AIEffic
     return acc + (point.actuatorOutputPower * (timeStep / 3600));
   }, 0);
 
-  const totalMotorEnergy = results.energyConsumption.total;
-  const overallEfficiency = totalMotorEnergy > 0 ? (totalActuatorEnergy / totalMotorEnergy) * 100 : 0;
+  const totalMotorEnergy = results.overallEfficiencyOp;
+  const overallEfficiency = totalMotorEnergy;
 
   return (
     <div className="space-y-4">
@@ -38,7 +38,7 @@ export const AIEfficiencyTab = ({ simulationData, results, prediction }: AIEffic
           <CardTitle className="flex items-center gap-2"><Zap /> Overall Cycle Efficiency</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-4xl font-bold">{overallEfficiency.toFixed(1)}%</div>
+          <div className="text-4xl font-bold">{totalMotorEnergy.toFixed(1)}%</div>
           <p className="text-muted-foreground mt-2">
             Ratio of useful actuator work to total energy consumed.
           </p>

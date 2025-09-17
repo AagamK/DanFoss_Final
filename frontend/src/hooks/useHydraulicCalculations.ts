@@ -20,48 +20,39 @@ export interface SimulationDataPoint {
 
 // --- HELPER 1: Get random error percent (10% to 20%) ---
 function getRandomErrorPercent(): number {
-  // Returns a random float between 0.10 and 0.20
   return (Math.random() * 0.10) + 0.10;
 }
 
-// --- HELPER 2: Fluctuation logic (This logic is correct) ---
-/**
- * Applies a high-frequency oscillation with a ramped envelope.
- * Amplitude is based on the 'maxValueForAmplitude' (the system max)
- * to ensure vibration is visible even in low-value phases.
- */
+// --- HELPER 2: Fluctuation logic (Unchanged) ---
 function applyFluctuationLogic(
   idealValue: number, 
-  maxValueForAmplitude: number, // System-wide max value
+  maxValueForAmplitude: number, 
   errorPercent: number, 
   isFluctuationPeriod: boolean, 
   phaseProgress: number
 ): number {
-
-  // If we are not in the fluctuation period or there's no error, return the perfect ideal value.
   if (!isFluctuationPeriod || errorPercent === 0) {
     return idealValue;
   }
-
-  // 1. CALCULATE THE AMPLITUDE ENVELOPE (The Ramp: 0 -> 1 -> 0)
   let envelope = 0;
   if (phaseProgress <= 0.05) {
-    const progressInWindow = phaseProgress / 0.05; // Map to [0.0, 1.0]
-    envelope = Math.sin(progressInWindow * Math.PI); // Get the 0->1 ramp
+    const progressInWindow = phaseProgress / 0.05;
+    envelope = Math.sin(progressInWindow * Math.PI);
   } else if (phaseProgress >= 0.95) {
-    const progressInWindow = (phaseProgress - 0.95) / 0.05; // Map to [0.0, 1.0]
-    envelope = Math.sin(progressInWindow * Math.PI); // Get the 1->0 ramp
+    const progressInWindow = (phaseProgress - 0.95) / 0.05;
+    envelope = Math.sin(progressInWindow * Math.PI);
   }
-
-  // 2. CALCULATE THE CARRIER WAVE (The fast oscillation)
-  const frequency = 90; // How fast it vibrates
+  const frequency = 90;
   const oscillation = Math.sin(phaseProgress * frequency * 2 * Math.PI);
-
-  // 3. COMBINE THEM
   const maxAmplitude = maxValueForAmplitude * errorPercent; 
-  const currentAmplitude = maxAmplitude * envelope; // Scale the amplitude by the ramp
-
+  const currentAmplitude = maxAmplitude * envelope;
   return idealValue + (currentAmplitude * oscillation);
+}
+
+// --- HELPER 3: Easing function for smooth curves (Unchanged) ---
+function easeValue(startValue: number, endValue: number, progress: number): number {
+  const easedProgress = (1 - Math.cos(progress * Math.PI)) / 2;
+  return startValue + (endValue - startValue) * easedProgress;
 }
 
 
@@ -79,7 +70,7 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
     setError(null);
     await new Promise((resolve) => setTimeout(resolve, 1000)); 
     try {
-      // --- Initial Calculations ---
+      // --- Initial Calculations (unchanged) ---
       if (parameters.motorRpm <= 0) { throw new Error("Motor RPM must be greater than zero."); }
       if (parameters.pumpEfficiency <= 0 || parameters.pumpEfficiency > 1) { throw new Error("Pump Efficiency must be between 0 and 1."); }
       
@@ -90,7 +81,6 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
       const holdingLoadN = parameters.holdingLoad * 1000 * 9.81;
       const headLoss = parameters.systemLosses || 10;
       
-      // Calculate phase-specific metrics
       const pressureFastDown = deadLoadN / (cylinderAreaBore * 100000) + headLoss;
       const pressureWorkingCycle = holdingLoadN / (cylinderAreaBore * 100000) + headLoss;
       const pressureHolding = pressureWorkingCycle;
@@ -113,50 +103,63 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
       const actuatorPowerWorking = (holdingLoadN * (parameters.phases.workingCycle.speed / 1000)) / 1000;
       const actuatorPowerFastUp = (deadLoadN * (parameters.phases.fastUp.speed / 1000)) / 1000;
 
-      // --- Calculate SYSTEM MAX values for fluctuation amplitude ---
       const maxFlow = Math.max(flowFastDown, flowWorkingCycle, flowFastUp);
-      const pumpFlowRate = maxFlow; // This is the value for the results object
-      const pumpDisplacement = (pumpFlowRate * 1000) / parameters.motorRpm; // This is the value for the results object
+      const pumpFlowRate = maxFlow;
+      const pumpDisplacement = (pumpFlowRate * 1000) / parameters.motorRpm;
 
       const maxWorkingPressure = Math.max(pressureFastDown, pressureWorkingCycle, pressureHolding, pressureFastUp);
       const maxMotorPower = Math.max(powerFastDownMotor, powerWorkingCycleMotor, powerFastUpMotor);
       const maxActuatorPower = Math.max(actuatorPowerFastDown, actuatorPowerWorking, actuatorPowerFastUp);
       const maxSpeed = Math.max(parameters.phases.fastDown.speed, parameters.phases.workingCycle.speed, parameters.phases.fastUp.speed);
-      const maxStroke = parameters.strokeLength; // <-- THIS WAS THE MISSING VARIABLE
+      const maxStroke = parameters.strokeLength;
       const reliefValvePressure = maxWorkingPressure * 1.2;
 
-      // Energy calculations
-      const energyFastDown = powerFastDownMotor * (parameters.phases.fastDown.time / 3600);
-      const energyWorkingCycle = powerWorkingCycleMotor * (parameters.phases.workingCycle.time / 3600);
-      const energyHolding = powerHoldingMotor * (parameters.phases.holding.time / 3600);
-      const energyFastUp = powerFastUpMotor * (parameters.phases.fastUp.time / 3600);
+      const energyFastDown = powerFastDownMotor * (parameters.phases.fastDown.time );
+      const energyWorkingCycle = powerWorkingCycleMotor * (parameters.phases.workingCycle.time );
+      const energyHolding = powerHoldingMotor * (parameters.phases.holding.time );
+      const energyFastUp = powerFastUpMotor * (parameters.phases.fastUp.time );
       const totalEnergy = energyFastDown + energyWorkingCycle + energyHolding + energyFastUp;
+
+      const effFastDown = (actuatorPowerFastDown / powerFastDownMotor) *100;
+      const effWorking = (actuatorPowerWorking / powerWorkingCycleMotor) *100;
+      const effHolding = 0;
+      const effFastUp = (actuatorPowerFastUp / powerFastUpMotor) *100;
+      const totalEff = ((totalEnergy > 0) ? ((actuatorPowerFastDown * parameters.phases.fastDown.time + actuatorPowerWorking * parameters.phases.workingCycle.time + actuatorPowerFastUp * parameters.phases.fastUp.time) / totalEnergy) : 0) *100;
+
+      const totalActuatorOpPower = actuatorPowerFastDown * parameters.phases.fastDown.time + actuatorPowerWorking * parameters.phases.workingCycle.time + actuatorPowerFastUp * parameters.phases.fastUp.time ;
+      const totalPumpOpPower = (powerFastDownPump * parameters.phases.fastDown.time + powerWorkingCyclePump * parameters.phases.workingCycle.time + powerFastUpPump * parameters.phases.fastUp.time );
+      const overEff = parameters.pumpEfficiency * ( totalActuatorOpPower / totalPumpOpPower) *100;
+
+
       // --- End of calculations ---
 
       const idealDataPoints: SimulationDataPoint[] = [];
       const actualDataPoints: SimulationDataPoint[] = [];
 
+      // Add speed/stroke to phase data for easier looping
       const phases = [
-        { name: 'holding', time: parameters.phases.holding.time, pressure: pressureHolding, flow: flowHolding, motorPower: powerHoldingMotor, actuatorPower: 0, idealPower: 0 },
-        { name: 'fastDown', time: parameters.phases.fastDown.time, pressure: pressureFastDown, flow: flowFastDown, motorPower: powerFastDownMotor, actuatorPower: actuatorPowerFastDown, idealPower: powerFastDownPump },
-        { name: 'workingCycle', time: parameters.phases.workingCycle.time, pressure: pressureWorkingCycle, flow: flowWorkingCycle, motorPower: powerWorkingCycleMotor, actuatorPower: actuatorPowerWorking, idealPower: powerWorkingCyclePump },
-        { name: 'holding', time: parameters.phases.holding.time, pressure: pressureHolding, flow: flowHolding, motorPower: powerHoldingMotor, actuatorPower: 0, idealPower: 0 },
-        { name: 'fastUp', time: parameters.phases.fastUp.time, pressure: pressureFastUp, flow: flowFastUp, motorPower: powerFastUpMotor, actuatorPower: actuatorPowerFastUp, idealPower: powerFastUpPump },
-        { name: 'holding', time: parameters.phases.holding.time, pressure: pressureHolding, flow: flowHolding, motorPower: powerHoldingMotor, actuatorPower: 0, idealPower: 0 },
+        { name: 'holding', time: parameters.phases.holding.time, pressure: pressureHolding, flow: flowHolding, motorPower: powerHoldingMotor, actuatorPower: 0, idealPower: 0, speed: 0, stroke: 0 },
+        { name: 'fastDown', time: parameters.phases.fastDown.time, pressure: pressureFastDown, flow: flowFastDown, motorPower: powerFastDownMotor, actuatorPower: actuatorPowerFastDown, idealPower: powerFastDownPump, speed: parameters.phases.fastDown.speed, stroke: parameters.phases.fastDown.stroke },
+        { name: 'workingCycle', time: parameters.phases.workingCycle.time, pressure: pressureWorkingCycle, flow: flowWorkingCycle, motorPower: powerWorkingCycleMotor, actuatorPower: actuatorPowerWorking, idealPower: powerWorkingCyclePump, speed: parameters.phases.workingCycle.speed, stroke: parameters.phases.workingCycle.stroke },
+        { name: 'holding', time: parameters.phases.holding.time, pressure: pressureHolding, flow: flowHolding, motorPower: powerHoldingMotor, actuatorPower: 0, idealPower: 0, speed: 0, stroke: 0 },
+        { name: 'fastUp', time: parameters.phases.fastUp.time, pressure: pressureFastUp, flow: flowFastUp, motorPower: powerFastUpMotor, actuatorPower: actuatorPowerFastUp, idealPower: powerFastUpPump, speed: -parameters.phases.fastUp.speed, stroke: -parameters.phases.fastUp.stroke },
+        { name: 'holding', time: parameters.phases.holding.time, pressure: pressureHolding, flow: flowHolding, motorPower: powerHoldingMotor, actuatorPower: 0, idealPower: 0, speed: 0, stroke: 0 },
       ];
 
       let currentTime = 0;
-      let currentStroke = 0; // Tracks the IDEAL stroke
+      let currentStroke = 0;
 
       const timeStepQuiet = 0.25; 
-      const timeStepFluctuation = 0.01; // High-res timestep for vibration
+      const timeStepFluctuation = 0.01;
+      const transitionDuration = 0.2; // 0.2-second curve between phases
 
-      phases.forEach(phase => {
-        const phaseParams = parameters.phases[phase.name as keyof typeof parameters.phases];
-        const phaseDuration = phase.time;
+      for (let i = 0; i < phases.length; i++) {
+        const currentPhase = phases[i];
+        const nextPhase = phases[i + 1] || currentPhase; 
+
+        const phaseDuration = currentPhase.time;
         const phaseEndTime = currentTime + phaseDuration;
 
-        // Generate a unique random error for the START and END of this specific phase
         const startErrorPercent = getRandomErrorPercent();
         const endErrorPercent = getRandomErrorPercent();
 
@@ -171,64 +174,86 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
           const progress = phaseDuration > 0 ? Math.min(1, timeInPhase / phaseDuration) : 1;
           const isFluctuationPeriod = (progress <= 0.05 || progress >= 0.95);
 
-          // Select the correct error percentage for the current window
           let currentErrorPercent = 0;
           if (progress <= 0.05) {
             currentErrorPercent = startErrorPercent;
           } else if (progress >= 0.95) {
             currentErrorPercent = endErrorPercent;
           }
+          
+          const phaseNameString = currentPhase.name.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
+          
+          // --- 1. CALCULATE & PUSH "IDEAL" (STEPPED) DATA ---
+          // This is the "digital command" signal for the Graphs page. It has NO curves.
+          const idealSteppedStroke = currentStroke + (currentPhase.stroke * progress);
 
-          // Calculate "Ideal" values
-          const idealStrokeAtTime = currentStroke + (phase.name === 'fastUp' ? -phaseParams.stroke : phaseParams.stroke) * progress;
-          const idealSpeed = (phase.name === 'fastUp' ? -1 : 1) * (phaseParams.speed) * (phase.name === 'holding' ? 0 : 1);
-          const phaseNameString = phase.name.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase());
-
-          // --- 1. PUSH IDEAL (CLEAN) DATA ---
           idealDataPoints.push({
             time,
-            flow: phase.flow,
-            stroke: Math.max(0, idealStrokeAtTime),
-            pressure_cap: phase.pressure,
-            pressure_rod: phase.pressure * 0.2,
-            velocity: idealSpeed,
-            motorPower: phase.motorPower,
-            actuatorPower: phase.actuatorPower,
+            flow: currentPhase.flow, // Use the raw, stepped phase value
+            stroke: Math.max(0, idealSteppedStroke),
+            pressure_cap: currentPhase.pressure, // Use the raw, stepped phase value
+            pressure_rod: currentPhase.pressure * 0.2,
+            velocity: currentPhase.speed, // Use the raw, stepped phase value
+            motorPower: currentPhase.motorPower,
+            actuatorPower: currentPhase.actuatorPower,
             phase: phaseNameString,
-            pumpInputPower: phase.idealPower,
-            actualMotorInputPower: phase.motorPower,
-            actuatorOutputPower: phase.actuatorPower,
-            idealMotorInputPower: phase.idealPower
+            pumpInputPower: currentPhase.idealPower,
+            actualMotorInputPower: currentPhase.motorPower,
+            actuatorOutputPower: currentPhase.actuatorPower,
+            idealMotorInputPower: currentPhase.idealPower
           });
 
-          // --- 2. APPLY FLUCTUATION LOGIC (Passes SYSTEM MAX values) ---
-          const actualFlow = applyFluctuationLogic(phase.flow, maxFlow, currentErrorPercent, isFluctuationPeriod, progress);
-          const actualPressure = applyFluctuationLogic(phase.pressure, maxWorkingPressure, currentErrorPercent, isFluctuationPeriod, progress);
-          const actualVelocity = applyFluctuationLogic(idealSpeed, maxSpeed, currentErrorPercent, isFluctuationPeriod, progress);
-          const actualMotorInputPower = applyFluctuationLogic(phase.motorPower, maxMotorPower, currentErrorPercent, isFluctuationPeriod, progress);
-          const actualActuatorOutputPower = applyFluctuationLogic(phase.actuatorPower, maxActuatorPower, currentErrorPercent, isFluctuationPeriod, progress);
-          // Stroke fluctuation is relative to the total possible stroke
-          const actualStroke = applyFluctuationLogic(idealStrokeAtTime, maxStroke, currentErrorPercent, isFluctuationPeriod, progress);
+
+          // --- 2. CALCULATE "ACTUAL" (CURVED + FLUCTUATING) DATA ---
+          // This creates the "analog reality" for the Compare page.
+
+          // Start with the raw values.
+          let analogPressure = currentPhase.pressure;
+          let analogFlow = currentPhase.flow;
+          let analogSpeed = currentPhase.speed;
+          let analogMotorPower = currentPhase.motorPower;
+          let analogActuatorPower = currentPhase.actuatorPower;
+
+          // Check if we are in the transition window and apply the curve.
+          const timeUntilPhaseEnd = phaseEndTime - time;
+          if (timeUntilPhaseEnd <= transitionDuration && i < phases.length - 1) {
+            // We are at the end of a phase; ease into the *next* phase's values.
+            const transitionProgress = (transitionDuration - timeUntilPhaseEnd) / transitionDuration;
+            
+            analogPressure = easeValue(currentPhase.pressure, nextPhase.pressure, transitionProgress);
+            analogFlow = easeValue(currentPhase.flow, nextPhase.flow, transitionProgress);
+            analogSpeed = easeValue(currentPhase.speed, nextPhase.speed, transitionProgress);
+            analogMotorPower = easeValue(currentPhase.motorPower, nextPhase.motorPower, transitionProgress);
+            analogActuatorPower = easeValue(currentPhase.actuatorPower, nextPhase.actuatorPower, transitionProgress);
+          }
+
+          // Now, apply fluctuation logic *on top of* the (potentially curved) analog values.
+          const actualFlow = applyFluctuationLogic(analogFlow, maxFlow, currentErrorPercent, isFluctuationPeriod, progress);
+          const actualPressure = applyFluctuationLogic(analogPressure, maxWorkingPressure, currentErrorPercent, isFluctuationPeriod, progress);
+          const actualVelocity = applyFluctuationLogic(analogSpeed, maxSpeed, currentErrorPercent, isFluctuationPeriod, progress);
+          const actualStroke = applyFluctuationLogic(idealSteppedStroke, maxStroke, currentErrorPercent, isFluctuationPeriod, progress); // Stroke base is always the linear ideal
+          const actualMotorInputPower = applyFluctuationLogic(analogMotorPower, maxMotorPower, currentErrorPercent, isFluctuationPeriod, progress);
+          const actualActuatorOutputPower = applyFluctuationLogic(analogActuatorPower, maxActuatorPower, currentErrorPercent, isFluctuationPeriod, progress);
 
 
-          // --- 3. PUSH ACTUAL (FLUCTUATING) DATA ---
+          // --- 3. PUSH "ACTUAL" DATA ---
           actualDataPoints.push({
             time,
             flow: actualFlow,
             stroke: Math.max(0, actualStroke),
             pressure_cap: actualPressure,
-            pressure_rod: actualPressure * 0.2,
+            pressure_rod: actualPressure * 0.2, // Rod pressure based on fluctuating cap pressure
             velocity: actualVelocity,
             motorPower: actualMotorInputPower,
             actuatorPower: actualActuatorOutputPower,
             phase: phaseNameString,
-            pumpInputPower: phase.idealPower, 
+            pumpInputPower: currentPhase.idealPower, 
             actualMotorInputPower: actualMotorInputPower,
             actuatorOutputPower: actualActuatorOutputPower,
-            idealMotorInputPower: phase.idealPower 
+            idealMotorInputPower: currentPhase.idealPower 
           });
 
-          // DYNAMIC TIMESTEP
+          // --- 4. DYNAMIC TIMESTEP ---
           if (isFluctuationPeriod && phaseDuration > 0) {
             timeInPhase += timeStepFluctuation;
           } else {
@@ -240,17 +265,18 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
           }
         }
         
-        currentStroke += (phase.name === 'fastUp' ? -phaseParams.stroke : phaseParams.stroke);
-        currentTime = phaseEndTime;
-      });
+        currentStroke += currentPhase.stroke; // Move to the end of the ideal stroke
+        currentTime = phaseEndTime; // Set time exactly to the end
+      }
 
-      // --- CRASH FIX: This object is now correct and references variables in scope ---
       const calculatedResults: HydraulicResults = {
-        pumpFlowRate, // This is defined as maxFlow
-        pumpDisplacement, // This is defined above
+        pumpFlowRate,
+        pumpDisplacement,
         cylinderArea: { bore: cylinderAreaBore * 10000, rod: rodArea * 10000, annular: annularArea * 10000 },
         requiredPressure: { fastDown: pressureFastDown, workingCycle: pressureWorkingCycle, holding: pressureHolding, fastUp: pressureFastUp },
         motorPower: maxMotorPower, maxReliefValve: reliefValvePressure,
+        overallEfficiencyOp: overEff,
+        energyeff:{total: totalEff, perPhase: { fastDown: effFastDown, workingCycle: effWorking, holding: effHolding, fastUp: effFastUp }},
         energyConsumption: { total: totalEnergy, perPhase: { fastDown: energyFastDown, workingCycle: energyWorkingCycle, holding: energyHolding, fastUp: energyFastUp } }
       };
       
@@ -269,12 +295,11 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
     }
   }, [parameters]);
 
-  // Export both data arrays
   return {
     results, setResults, 
-    idealSimulationData,    // For the clean "Graphs" page
-    actualSimulationData,   // For the fluctuating "Compare" page
-    setSimulationData: setIdealSimulationData, // Kept for compatibility
+    idealSimulationData,    // Clean, "stepped" data for Graphs page
+    actualSimulationData,   // Curved, "analog," fluctuating data for Compare page
+    setSimulationData: setIdealSimulationData, // For compatibility
     isCalculating, runSimulation, error,
   };
 };
