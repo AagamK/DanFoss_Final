@@ -7,7 +7,7 @@ import HomePage from "@/pages/HomePage";
 import Index from "@/pages/Index";
 import SensorDataMonitoring from "@/pages/SensorDataMonitoring.tsx";
 import NotFound from "@/pages/NotFound";
-// import HydraulicCalculator from "@/components/HydraulicCalculator"
+import HydraulicCalculator from "@/components/HydraulicCalculator"; // <-- 1. ADD THIS IMPORT
 
 const queryClient = new QueryClient();
 
@@ -21,7 +21,7 @@ const App = () => (
           <Route path="/" element={<HomePage />} />
           <Route path="/simulator" element={<Index />} />
           <Route path="/monitoring" element={<SensorDataMonitoring />} /> 
-          {/* <Route path="/HydraulicCalculator" element={<HydraulicCalculator />}/> */}
+          <Route path="/HydraulicCalculator" element={<HydraulicCalculator />}/> {/* <-- 2. UNCOMMENT THIS ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

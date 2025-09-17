@@ -1,318 +1,442 @@
 import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Calculator, ArrowLeft, BarChart3, Settings, Brain, GitCompare, FileDown, Sheet } from "lucide-react";
-import { ParameterForm, HydraulicParameters } from "@/components/ParameterForm";
-import { ResultsDashboard } from "@/components/ResultsDashboard";
-import { SimulationGraphs } from "@/components/SimulationGraphs";
-import { useHydraulicCalculations } from "@/hooks/useHydraulicCalculations";
+import { Separator } from "@/components/ui/separator";
+import { ArrowLeft, Calculator, RotateCcw } from "lucide-react"; // Import Calculator and Reset icons
+import { Navigate } from "react-router-dom";
 import { useNavigate } from "react-router-dom";
-import { toast } from "@/components/ui/sonner";
-import { AIEfficiencyTab } from "@/components/AIEfficiencyTab";
-import { AIAdvisor } from "@/components/AIAdvisor";
-import type { PredictionResponse } from "@/types/predictions";
-import { CompareView } from "@/components/CompareView";
-import type { EnhancedSensorData } from "@/types/hydraulicData";
 
-import { svgAsPngUri } from 'save-svg-as-png';
-import { usePDF } from '@react-pdf/renderer';
-import { SimulationReport } from './SimulationReport';
-import { downloadDataAsCSV } from "@/lib/utils";
-
-
-const defaultParameters: HydraulicParameters = {
-  cylinderBore: 75,
-  rodDiameter: 45,
-  deadLoad: 2.5,
-  holdingLoad: 8,
-  motorRpm: 1800,
-  pumpEfficiency: 0.9,
-  systemLosses: 10,
-  strokeLength: 250,
-  pumpMeanFlowRate: 53,
-  fluidType: "ISO VG 46",
-  phases: {
-    fastDown: { speed: 200, stroke: 200, time: 1 },
-    workingCycle: { speed: 10, stroke: 50, time: 5 },
-    holding: { speed: 0, stroke: 0, time: 2 },
-    fastUp: { speed: 200, stroke: 250, time: 1.25 }
-  }
-};
-
-export interface ComparisonDataPoint {
-  time: number;
-  idealPosition: number;
-  actualPosition: number;
-  positionError: number;
-  idealVelocity: number;
-  actualVelocity: number;
-  velocityError: number;
-  idealPressure: number;
-  actualPressure: number;
-  pressureError: number;
-  idealFlow: number;
-  actualFlow: number;
-  flowError: number;
-  idealPower: number;
-  actualPower: number;
-  powerError: number;
+/* This enum tracks the *last input the user typed into* so we only
+  calculate the *other* fields, preventing infinite loops.
+*/
+enum LastChangedField {
+    NONE,
+    // Cylinder
+    CYL_DIAMETER,
+    CYL_ROD,
+    CYL_PRESSURE,
+    CYL_FORCE_EXT,
+    CYL_FORCE_RET,
+    CYL_FLOW,
+    CYL_VEL_EXT,
+    CYL_VEL_RET,
+    // Pump
+    PUMP_DISPLACEMENT,
+    PUMP_RPM,
+    PUMP_PRESSURE,
+    PUMP_FLOW,
+    PUMP_EFF,
+    // Motor
+    MOT_DISPLACEMENT,
+    MOT_RPM,
+    MOT_PRESSURE,
+    MOT_FLOW,
+    MOT_MECH_EFF,
+    MOT_VOL_EFF,
 }
 
-const easeInOutSine = (x: number): number => -(Math.cos(Math.PI * x) - 1) / 2;
+// Helper to safely parse floats from string inputs
+const safeParse = (val: string): number => parseFloat(val) || 0;
 
-// --- STEP 1: RENAMED COMPONENT ---
-export const HydraulicCalculator = () => {
-  const navigate = useNavigate();
-  const [parameters, setParameters] = useState<HydraulicParameters>(defaultParameters);
-  const [activeTab, setActiveTab] = useState("parameters");
-  
-  const { results, idealSimulationData, actualSimulationData, isCalculating, runSimulation, error } = useHydraulicCalculations(parameters);
-  
-  const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
-  const [comparisonData, setComparisonData] = useState<ComparisonDataPoint[]>([]);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isCapturing, setIsCapturing] = useState(false);
-
-  const [pdfInstance, updatePdfInstance] = usePDF({
-    document: <SimulationReport results={{}} parameters={defaultParameters} graphImages={[]} />,
-  });
-
-  useEffect(() => { if (error) { toast.error("Simulation Failed", { description: error }); } }, [error]);
-
-  // Effect to calculate Comparison data (unchanged)
-  useEffect(() => {
-    if (actualSimulationData && actualSimulationData.length > 0) {
-      const { phases, cylinderBore, rodDiameter, deadLoad, holdingLoad } = parameters;
-      const areaCapEnd = Math.PI * Math.pow(cylinderBore / 2, 2);
-      const areaRod = Math.PI * Math.pow(rodDiameter / 2, 2);
-      const areaAnnulus = areaCapEnd - areaRod;
-      const transitionDuration = 0.050; 
-      const v1 = phases.fastDown.speed, v2 = phases.workingCycle.speed, v3 = 0, v4 = -phases.fastUp.speed;
-      const p1_dur = phases.fastDown.time - (transitionDuration / 2), t1_dur = transitionDuration;
-      const p2_dur = phases.workingCycle.time - (transitionDuration / 2), t2_dur = transitionDuration;
-      const p3_dur = phases.holding.time - (transitionDuration / 2), t3_dur = transitionDuration;
-      const p4_dur = phases.fastUp.time - (transitionDuration / 2);
-      const t0 = 0.0, t1_p_end = t0 + p1_dur, t1_t_end = t1_p_end + t1_dur, t2_p_end = t1_t_end + p2_dur, t2_t_end = t2_p_end + t2_dur;
-      const t3_p_end = t2_t_end + p3_dur, t3_t_end = t3_p_end + t3_dur, t4_p_end = t3_t_end + p4_dur; // This line is fixed
-      const pos_p1_end = v1 * p1_dur, pos_t1_end = pos_p1_end + ((v1 + v2) / 2) * t1_dur, pos_p2_end = pos_t1_end + (v2 * p2_dur);
-      const pos_t2_end = pos_p2_end + ((v2 + v3) / 2) * t2_dur, pos_p3_end = pos_t2_end + (v3 * p3_dur), pos_t3_end = pos_p3_end + ((v3 + v4) / 2) * t3_dur;
-
-      const getIdealMetrics = (t: number) => {
-        let idealPos = 0, idealVel = 0, idealPres = 0, idealFlow = 0, idealPower = 0;
-        let loadN = 0, area_mm2 = areaCapEnd, isRetract = false;
-        if (t <= t1_p_end) {
-          idealVel = v1; idealPos = v1 * t; loadN = deadLoad * 9810; area_mm2 = areaCapEnd;
-        } else if (t <= t1_t_end) {
-          const rt = (t - t1_p_end), p = rt / t1_dur, eP = easeInOutSine(p);
-          idealVel = v1 + (v2 - v1) * eP;
-          const intE = (rt / 2) - (t1_dur * Math.sin(Math.PI * p)) / (2 * Math.PI);
-          idealPos = pos_p1_end + (v1 * rt) + (v2 - v1) * intE;
-          loadN = deadLoad * 9810; area_mm2 = areaCapEnd;
-        } else if (t <= t2_p_end) {
-          idealVel = v2; idealPos = pos_t1_end + v2 * (t - t1_t_end); loadN = holdingLoad * 9810; area_mm2 = areaCapEnd;
-        } else if (t <= t2_t_end) {
-          const rt = (t - t2_p_end), p = rt / t2_dur, eP = easeInOutSine(p);
-          idealVel = v2 + (v3 - v2) * eP;
-          const intE = (rt / 2) - (t2_dur * Math.sin(Math.PI * p)) / (2 * Math.PI);
-          idealPos = pos_p2_end + (v2 * rt) + (v3 - v2) * intE;
-          loadN = holdingLoad * 9810; area_mm2 = areaCapEnd;
-        } else if (t <= t3_p_end) {
-          idealVel = v3; idealPos = pos_t2_end; loadN = holdingLoad * 9810; area_mm2 = areaCapEnd;
-        } else if (t <= t3_t_end) {
-          const rt = (t - t3_p_end), p = rt / t3_dur, eP = easeInOutSine(p);
-          idealVel = v3 + (v4 - v3) * eP;
-          const intE = (rt / 2) - (t3_dur * Math.sin(Math.PI * p)) / (2 * Math.PI);
-          idealPos = pos_p3_end + (v3 * rt) + (v4 - v3) * intE;
-          loadN = deadLoad * 9810; area_mm2 = areaAnnulus; isRetract = true;
-        } else if (t <= t4_p_end) {
-          idealVel = v4; idealPos = pos_t3_end + v4 * (t - t3_t_end); loadN = deadLoad * 9810; area_mm2 = areaAnnulus; isRetract = true;
-        } else { idealVel = 0; idealPos = 0; loadN = 0; }
-        if (isRetract) { idealPres = 0; } else if (loadN > 0) { idealPres = (loadN / area_mm2) * 10; }
-        idealFlow = Math.abs(area_mm2 * (idealVel) * 0.00006);
-        if (idealFlow > 0) { let pPres = idealPres; if (isRetract) { pPres = ((loadN / areaAnnulus) * 10); } idealPower = (pPres * idealFlow) / 600; }
-        return { idealPosition: Math.max(0, idealPos), idealVelocity: idealVel, idealPressure: idealPres, idealFlow: idealFlow, idealPower: idealPower };
-      };
-      
-      const processedData = actualSimulationData.map((dataPoint: EnhancedSensorData, index: number) => {
-        const ideal = getIdealMetrics(dataPoint.time);
-        let actualVelocity = dataPoint.velocity;
-        const actual = { actualPosition: dataPoint.stroke, actualVelocity: actualVelocity, actualPressure: dataPoint.pressure_cap, actualFlow: dataPoint.flow, actualPower: dataPoint.actuatorOutputPower };
-        
-        return {
-          time: dataPoint.time, ...ideal, ...actual,
-          positionError: ideal.idealPosition - actual.actualPosition, velocityError: ideal.idealVelocity - actual.actualVelocity,
-          pressureError: ideal.idealPressure - actual.actualPressure, flowError: ideal.idealFlow - actual.actualFlow,
-          powerError: ideal.idealPower - actual.actualPower,
-        };
-      });
-      setComparisonData(processedData);
-    }
-  }, [actualSimulationData, parameters]); 
-
-  const handleRunSimulation = () => {
-    setPrediction(null); 
-    setComparisonData([]); 
-    runSimulation(); 
-    setActiveTab("results");
-  };
-
-  useEffect(() => {
-    if (!isExporting || !pdfInstance.url) return;
-    const link = document.createElement('a');
-    link.href = pdfInstance.url;
-    link.download = 'Hydraulic-Simulation-Report.pdf';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    toast.success("Report Exported");
-    setIsExporting(false);
-  }, [pdfInstance.url, isExporting]);
-
-  const handleExportPDF = async () => {
-    setIsExporting(true);
-    toast.info("Generating Report...", { description: "Rendering static charts..." });
-    setIsCapturing(true);
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    let graphImageUris: string[] = [];
-    try {
-      const portalElement = document.getElementById('capture-portal');
-      if (!portalElement) { throw new Error("PDF capture portal failed to render."); }
-      const svgElements = portalElement.querySelectorAll('svg');
-      if (svgElements.length === 0) { throw new Error("No SVG charts found in the capture portal."); }
-      const conversionPromises = Array.from(svgElements).map(svg =>
-        svgAsPngUri(svg, { scale: 2, backgroundColor: '#FFFFFF' })
-      );
-      graphImageUris = await Promise.all(conversionPromises);
-    } catch (err: any) { 
-      console.error(err);
-      toast.error("Graph Conversion Failed", { description: err.message });
-      setIsExporting(false);
-      setIsCapturing(false); 
-      return;
-    }
-    setIsCapturing(false);
-    updatePdfInstance(
-      <SimulationReport
-        results={results}
-        parameters={parameters}
-        graphImages={graphImageUris}
-      />
-    );
-  };
-
-  const handleExportIdealCSV = useCallback(() => {
-    toast.info("Exporting Ideal Data CSV...");
-    downloadDataAsCSV(idealSimulationData, "ideal_simulation_data.csv");
-  }, [idealSimulationData]); 
-
-  const handleExportActualCSV = useCallback(() => {
-    toast.info("Exporting Actual Data CSV...");
-    downloadDataAsCSV(actualSimulationData, "actual_simulation_data.csv");
-  }, [actualSimulationData]); 
-
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
-      <div className="container mx-auto p-6 max-w-7xl">
-        <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
-            <Button variant="outline" onClick={() => navigate('/')}>
-              <ArrowLeft className="h-4 w-4 mr-2" /> Back to Home
-            </Button>
-          </div>
-          <div className="flex items-center gap-3 mb-4">
-            <div className="p-2 bg-primary/10 rounded-lg"><Calculator className="h-8 w-8 text-primary" /></div>
-            {/* --- STEP 1: RENAMED H1 TITLE --- */}
-            <div><h1 className="text-3xl font-bold text-foreground">Hydraulic Simulator Calculator</h1></div>
-          </div>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-wrap gap-4">
-              <Button onClick={handleRunSimulation} disabled={isCalculating}>
-                <Calculator className="h-4 w-4 mr-2" />
-                {isCalculating ? "Calculating..." : "Run Simulation"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleExportPDF}
-                disabled={isExporting || isCalculating || idealSimulationData.length === 0}
-              >
-                <FileDown className="h-4 w-4 mr-2" />
-                {isExporting ? "Generating PDF..." : "Export PDF Report"}
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleExportIdealCSV}
-                disabled={isCalculating || idealSimulationData.length === 0}
-              >
-                <Sheet className="h-4 w-4 mr-2" />
-                Export Ideal CSV (Graphs)
-              </Button>
-              <Button
-                variant="outline"
-                onClick={handleExportActualCSV}
-                disabled={isCalculating || actualSimulationData.length === 0}
-              >
-                <Sheet className="h-4 w-4 mr-2" />
-                Export Actual CSV (Compare)
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-8">
-          <TabsList className="grid w-full grid-cols-5">
-            <TabsTrigger value="parameters"><Settings className="h-4 w-4 mr-2" />Parameters</TabsTrigger>
-            <TabsTrigger value="results"><Calculator className="h-4 w-4 mr-2" />Results</TabsTrigger>
-            <TabsTrigger value="graphs"><BarChart3 className="h-4 w-4 mr-2" />Graphs</TabsTrigger>
-            <TabsTrigger value="compare"><GitCompare className="h-4 w-4 mr-2" />Compare</TabsTrigger>
-            <TabsTrigger value="aiDiagnostics"><Brain className="h-4 w-4 mr-2" />AI Diagnostics</TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="parameters" className="mt-6">
-            <ParameterForm parameters={parameters} onParametersChange={setParameters} />
-          </TabsContent>
-          <TabsContent value="results" className="mt-6">
-            <ResultsDashboard results={results} isCalculating={isCalculating} />
-          </TabsContent>
-          <TabsContent value="graphs" className="mt-6">
-            <SimulationGraphs data={idealSimulationData} isLoading={isCalculating} />
-          </TabsContent>
-          <TabsContent value="compare" className="mt-6">
-            <CompareView comparisonData={comparisonData} simulationData={actualSimulationData} />
-          </TabsContent>
-          <TabsContent value="aiDiagnostics" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <AIAdvisor
-                simulationData={actualSimulationData}
-                onPrediction={setPrediction}
-              />
-              <AIEfficiencyTab
-                simulationData={actualSimulationData}
-                results={results}
-                prediction={prediction}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
-      </div>
-
-      {isCapturing && (
-        <div
-          id="capture-portal"
-          style={{
-            position: 'absolute',
-            left: '-9999px',
-            top: 0,
-            width: '1200px',
-            backgroundColor: 'white',
-          }}
-        >
-          <CompareView 
-            comparisonData={comparisonData} 
-            simulationData={actualSimulationData} 
-          />
-        </div>
-      )}
-    </div>
-  );
+// Helper to format numbers back to strings for the UI
+const formatNum = (num: number, precision = 2): string => {
+    if (isNaN(num) || !isFinite(num)) return "";
+    return num.toFixed(precision);
 };
+
+export const HydraulicCalculator = () => {
+    // --- STATE MANAGEMENT ---
+    const [lastChanged, setLastChanged] = useState<LastChangedField>(LastChangedField.NONE);
+
+    // --- Cylinder States ---
+    const [cylPistonDiameter, setCylPistonDiameter] = useState("75");
+    const [cylRodDiameter, setCylRodDiameter] = useState("45");
+    const [cylPressure, setCylPressure] = useState("210");
+    const [cylFlow, setCylFlow] = useState("53");
+    const [cylForceExt, setCylForceExt] = useState("");
+    const [cylForceRet, setCylForceRet] = useState("");
+    const [cylRatio, setCylRatio] = useState("");
+    const [cylVelExt, setCylVelExt] = useState("");
+    const [cylVelRet, setCylVelRet] = useState("");
+
+    // --- Pump States ---
+    const [pumpDisplacement, setPumpDisplacement] = useState("35");
+    const [pumpRpm, setPumpRpm] = useState("1800");
+    const [pumpPressure, setPumpPressure] = useState("210");
+    const [pumpEff, setPumpEff] = useState("0.9");
+    const [pumpFlow, setPumpFlow] = useState("");
+    const [pumpPower, setPumpPower] = useState("");
+
+    // --- Motor States ---
+    const [motDisplacement, setMotDisplacement] = useState("50");
+    const [motPressure, setMotPressure] = useState("210");
+    const [motRpm, setMotRpm] = useState("1500");
+    const [motFlow, setMotFlow] = useState("80");
+    const [motMechEff, setMotMechEff] = useState("0.92");
+    const [motVolEff, setMotVolEff] = useState("0.95");
+    const [motTorque, setMotTorque] = useState("");
+    const [motPower, setMotPower] = useState("");
+    const [motTotalEff, setMotTotalEff] = useState("");
+
+    // --- MAIN CALCULATION FUNCTION ---
+    // This function reads all current states and performs the math.
+    const handleCalculate = useCallback(() => {
+        // --- Parse all cylinder values safely ---
+        const D = safeParse(cylPistonDiameter); // mm
+        const d = safeParse(cylRodDiameter); // mm
+        let P_cyl = safeParse(cylPressure); // bar
+        let F_ext = safeParse(cylForceExt); // kN
+        let F_ret = safeParse(cylForceRet); // kN
+        let Q_cyl = safeParse(cylFlow); // l/min
+        let v_ext = safeParse(cylVelExt); // m/s
+        let v_ret = safeParse(cylVelRet); // m/s
+
+        const A_bore = Math.PI * Math.pow(D / 2, 2); // mm^2
+        const A_rod = Math.PI * (Math.pow(D / 2, 2) - Math.pow(d / 2, 2)); // mm^2
+        const ratio = A_bore / A_rod;
+
+        // Calculate cylinder values based on the last field the user changed
+        switch (lastChanged) {
+            case LastChangedField.CYL_FORCE_EXT:
+                P_cyl = (F_ext * 10000) / A_bore; // kN -> bar
+                break;
+            case LastChangedField.CYL_FORCE_RET:
+                P_cyl = (F_ret * 10000) / A_rod; // kN -> bar
+                break;
+            case LastChangedField.CYL_VEL_EXT:
+                Q_cyl = (v_ext * A_bore * 60000) / 1000000; // l/min
+                break;
+            case LastChangedField.CYL_VEL_RET:
+                Q_cyl = (v_ret * A_rod * 60000) / 1000000; // l/min
+                break;
+            default: // Includes NONE, CYL_DIAMETER, CYL_ROD, CYL_PRESSURE, CYL_FLOW
+                F_ext = (P_cyl * A_bore) / 10000; // (bar * mm^2) -> kN
+                F_ret = (P_cyl * A_rod) / 10000; // (bar * mm^2) -> kN
+                v_ext = (Q_cyl * 1000000) / (A_bore * 60000); // m/s
+                v_ret = (Q_cyl * 1000000) / (A_rod * 60000);
+                break;
+        }
+
+        // Update all calculated cylinder fields, *except* the one that triggered the calculation
+        if (lastChanged !== LastChangedField.CYL_PRESSURE) setCylPressure(formatNum(P_cyl));
+        if (lastChanged !== LastChangedField.CYL_FORCE_EXT) setCylForceExt(formatNum(F_ext));
+        if (lastChanged !== LastChangedField.CYL_FORCE_RET) setCylForceRet(formatNum(F_ret));
+        if (lastChanged !== LastChangedField.CYL_FLOW) setCylFlow(formatNum(Q_cyl));
+        if (lastChanged !== LastChangedField.CYL_VEL_EXT) setCylVelExt(formatNum(v_ext, 3));
+        if (lastChanged !== LastChangedField.CYL_VEL_RET) setCylVelRet(formatNum(v_ret, 3));
+        setCylRatio(formatNum(ratio));
+
+        // --- Pump Calculations ---
+        let q_pump = (safeParse(pumpDisplacement) * safeParse(pumpRpm)) / 1000; // (cc/rev * rpm) -> l/min
+        let disp_pump = safeParse(pumpDisplacement);
+
+        if (lastChanged === LastChangedField.PUMP_FLOW) {
+            disp_pump = (safeParse(pumpFlow) * 1000) / safeParse(pumpRpm); // cc/rev
+            setPumpDisplacement(formatNum(disp_pump));
+        } else {
+            setPumpFlow(formatNum(q_pump));
+        }
+        const pwr_pump = (Math.max(q_pump, safeParse(pumpFlow)) * safeParse(pumpPressure)) / (600 * safeParse(pumpEff)); // kW
+        setPumpPower(formatNum(pwr_pump));
+
+        // --- Motor Calculations ---
+        const p_mot = safeParse(motPressure);
+        let disp_mot = safeParse(motDisplacement);
+        const q_mot = safeParse(motFlow);
+        const v_eff = safeParse(motVolEff);
+        const m_eff = safeParse(motMechEff);
+        let rpm_mot = safeParse(motRpm);
+
+        if (lastChanged === LastChangedField.MOT_RPM) {
+            disp_mot = (q_mot * 1000 * v_eff) / rpm_mot;
+            setMotDisplacement(formatNum(disp_mot));
+        } else {
+            rpm_mot = (q_mot * 1000 * v_eff) / disp_mot;
+            setMotRpm(formatNum(rpm_mot, 0));
+        }
+
+        const torque_mot = (disp_mot * p_mot * m_eff) / (20 * Math.PI); // Nm
+        const power_mot = (torque_mot * rpm_mot) / 9550; // kW
+        const total_eff = m_eff * v_eff;
+
+        setMotTorque(formatNum(torque_mot));
+        setMotPower(formatNum(power_mot));
+        setMotTotalEff(formatNum(total_eff, 3));
+
+    }, [
+        // This function needs to be re-created if any of these values change
+        cylPistonDiameter, cylRodDiameter, cylPressure, cylFlow, cylForceExt, cylForceRet, cylVelExt, cylVelRet,
+        pumpDisplacement, pumpRpm, pumpPressure, pumpEff, pumpFlow,
+        motDisplacement, motPressure, motRpm, motFlow, motMechEff, motVolEff,
+        lastChanged
+    ]);
+
+    // --- **THIS IS THE FIX** ---
+    // This hook runs the calculation ONLY ONCE when the component first mounts.
+    // This populates the output fields with values from the default inputs.
+    useEffect(() => {
+        handleCalculate();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // <-- Empty dependency array ensures this runs ONLY ONCE.
+    // We disable the lint warning because we *intentionally* do not want
+    // this to re-run when handleCalculate (or its dependencies) change.
+
+    // --- Reset Functions ---
+    const resetCylinder = () => {
+        setLastChanged(LastChangedField.NONE);
+        setCylPistonDiameter("75");
+        setCylRodDiameter("45");
+        setCylPressure("210");
+        setCylFlow("53");
+        // Clear outputs, user must click Calculate
+        setCylForceExt("");
+        setCylForceRet("");
+        setCylRatio("");
+        setCylVelExt("");
+        setCylVelRet("");
+    };
+
+    const resetPump = () => {
+        setLastChanged(LastChangedField.NONE);
+        setPumpDisplacement("35");
+        setPumpRpm("1800");
+        setPumpPressure("210");
+        setPumpEff("0.9");
+        setPumpFlow("");
+        setPumpPower("");
+    };
+
+    const resetMotor = () => {
+        setLastChanged(LastChangedField.NONE);
+        setMotDisplacement("50");
+        setMotPressure("210");
+        setMotRpm("1500");
+        setMotFlow("80");
+        setMotMechEff("0.92");
+        setMotVolEff("0.95");
+        setMotTorque("");
+        setMotPower("");
+        setMotTotalEff("");
+    };
+
+    const Navigate = useNavigate();
+
+    // --- JSX RENDER ---
+    return (
+        <div className="container mx-auto p-6 max-w-7xl">
+            <div className="flex items-center gap-4 mb-4">
+                <Button variant="outline" onClick={() => Navigate('/')}>
+                    <ArrowLeft className="h-4 w-4 mr-2" /> Back to Home
+                </Button>
+            </div>
+            <h1 className="text-3xl font-bold mb-6">Hydraulic Calculator</h1>
+
+            <Tabs defaultValue="cylinder" className="w-full">
+                <TabsList className="grid w-full grid-cols-3">
+                    <TabsTrigger value="cylinder">Cylinder</TabsTrigger>
+                    <TabsTrigger value="pump">Pump</TabsTrigger>
+                    <TabsTrigger value="motor">Motor</TabsTrigger>
+                </TabsList>
+
+                {/* --- CYLINDER TAB --- */}
+                <TabsContent value="cylinder">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Cylinder Calculations</CardTitle>
+                            {/* --- Button Group --- */}
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={resetCylinder}>
+                                    <RotateCcw className="h-4 w-4 mr-2" />
+                                    Reset
+                                </Button>
+                                <Button size="sm" onClick={handleCalculate}>
+                                    <Calculator className="h-4 w-4 mr-2" />
+                                    Calculate
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                            {/* Inputs Column */}
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="cyl-piston-dia">Piston Diameter (mm)</Label>
+                                    <Input id="cyl-piston-dia" type="number" value={cylPistonDiameter}
+                                        onChange={(e) => { setCylPistonDiameter(e.target.value); setLastChanged(LastChangedField.CYL_DIAMETER); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cyl-rod-dia">Rod Diameter (mm)</Label>
+                                    <Input id="cyl-rod-dia" type="number" value={cylRodDiameter}
+                                        onChange={(e) => { setCylRodDiameter(e.target.value); setLastChanged(LastChangedField.CYL_ROD); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cyl-pressure">Pressure (bar)</Label>
+                                    <Input id="cyl-pressure" type="number" value={cylPressure}
+                                        onChange={(e) => { setCylPressure(e.target.value); setLastChanged(LastChangedField.CYL_PRESSURE); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cyl-flow">Flow Rate (l/min)</Label>
+                                    <Input id="cyl-flow" type="number" value={cylFlow}
+                                        onChange={(e) => { setCylFlow(e.target.value); setLastChanged(LastChangedField.CYL_FLOW); }} />
+                                </div>
+                            </div>
+
+                            {/* Outputs Column */}
+                            <div className="space-y-4 rounded-lg bg-muted p-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="cyl-force-ext">Force Extend (kN)</Label>
+                                    <Input id="cyl-force-ext" value={cylForceExt} readOnly className="font-bold text-primary" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cyl-force-ret">Force Retract (kN)</Label>
+                                    <Input id="cyl-force-ret" value={cylForceRet} readOnly className="font-bold text-primary" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cyl-vel-ext">Velocity Extend (m/s)</Label>
+                                    <Input id="cyl-vel-ext" value={cylVelExt} readOnly className="font-bold text-primary" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cyl-vel-ret">Velocity Retract (m/s)</Label>
+                                    <Input id="cyl-vel-ret" value={cylVelRet} readOnly className="font-bold text-primary" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="cyl-ratio">Area Ratio</Label>
+                                    <Input id="cyl-ratio" value={cylRatio} readOnly className="font-bold text-primary" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* --- PUMP TAB --- */}
+                <TabsContent value="pump">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Pump Calculations</CardTitle>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={resetPump}>
+                                    <RotateCcw className="h-4 w-4 mr-2" />
+                                    Reset
+                                </Button>
+                                <Button size="sm" onClick={handleCalculate}>
+                                    <Calculator className="h-4 w-4 mr-2" />
+                                    Calculate
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                            {/* Inputs */}
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="pump-disp">Displacement (cc/rev)</Label>
+                                    <Input id="pump-disp" type="number" value={pumpDisplacement}
+                                        onChange={(e) => { setPumpDisplacement(e.target.value); setLastChanged(LastChangedField.PUMP_DISPLACEMENT); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="pump-rpm">Pump Speed (rpm)</Label>
+                                    <Input id="pump-rpm" type="number" value={pumpRpm}
+                                        onChange={(e) => { setPumpRpm(e.target.value); setLastChanged(LastChangedField.PUMP_RPM); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="pump-pressure">Pressure (bar)</Label>
+                                    <Input id="pump-pressure" type="number" value={pumpPressure}
+                                        onChange={(e) => { setPumpPressure(e.target.value); setLastChanged(LastChangedField.PUMP_PRESSURE); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="pump-eff">Overall Efficiency (0.0 - 1.0)</Label>
+                                    <Input id="pump-eff" type="number" step="0.01" value={pumpEff}
+                                        onChange={(e) => { setPumpEff(e.target.value); setLastChanged(LastChangedField.PUMP_EFF); }} />
+                                </div>
+                            </div>
+                            {/* Outputs */}
+                            <div className="space-y-4 rounded-lg bg-muted p-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="pump-flow">Theoretical Flow Rate (l/min)</Label>
+                                    <Input id="pump-flow" value={pumpFlow} readOnly className="font-bold text-primary" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="pump-power">Required Input Power (kW)</Label>
+                                    <Input id="pump-power" value={pumpPower} readOnly className="font-bold text-primary" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+                {/* --- MOTOR TAB --- */}
+                <TabsContent value="motor">
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle>Motor Calculations</CardTitle>
+                            <div className="flex gap-2">
+                                <Button variant="outline" size="sm" onClick={resetMotor}>
+                                    <RotateCcw className="h-4 w-4 mr-2" />
+                                    Reset
+                                </Button>
+                                <Button size="sm" onClick={handleCalculate}>
+                                    <Calculator className="h-4 w-4 mr-2" />
+                                    Calculate
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                            {/* Inputs */}
+                            <div className="space-y-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="mot-disp">Displacement (cc/rev)</Label>
+                                    <Input id="mot-disp" type="number" value={motDisplacement}
+                                        onChange={(e) => { setMotDisplacement(e.target.value); setLastChanged(LastChangedField.MOT_DISPLACEMENT); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="mot-pressure">Pressure (bar)</Label>
+                                    <Input id="mot-pressure" type="number" value={motPressure}
+                                        onChange={(e) => { setMotPressure(e.target.value); setLastChanged(LastChangedField.MOT_PRESSURE); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="mot-flow">Input Flow (l/min)</Label>
+                                    <Input id="mot-flow" type="number" value={motFlow}
+                                        onChange={(e) => { setMotFlow(e.target.value); setLastChanged(LastChangedField.MOT_FLOW); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="mot-mech-eff">Mechanical Efficiency (0.0 - 1.0)</Label>
+                                    <Input id="mot-mech-eff" type="number" step="0.01" value={motMechEff}
+                                        onChange={(e) => { setMotMechEff(e.target.value); setLastChanged(LastChangedField.MOT_MECH_EFF); }} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="mot-vol-eff">Volumetric Efficiency (0.0 - 1.0)</Label>
+                                    <Input id="mot-vol-eff" type="number" step="0.01" value={motVolEff}
+                                        onChange={(e) => { setMotVolEff(e.target.value); setLastChanged(LastChangedField.MOT_VOL_EFF); }} />
+                                </div>
+                            </div>
+                            {/* Outputs */}
+                            <div className="space-y-4 rounded-lg bg-muted p-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="mot-rpm">Output Speed (rpm)</Label>
+                                    <Input id="mot-rpm" value={motRpm} readOnly className="font-bold text-primary" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="mot-torque">Output Torque (Nm)</Label>
+                                    <Input id="mot-torque" value={motTorque} readOnly className="font-bold text-primary" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="mot-power">Output Power (kW)</Label>
+                                    <Input id="mot-power" value={motPower} readOnly className="font-bold text-primary" />
+                                </div>
+                                <Separator className="my-4" />
+                                <div className="space-y-2">
+                                    <Label htmlFor="mot-total-eff">Total Efficiency</Label>
+                                    <Input id="mot-total-eff" value={motTotalEff} readOnly className="font-bold text-primary" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
+
+            </Tabs>
+        </div>
+    );
+};
+
+export default HydraulicCalculator;
