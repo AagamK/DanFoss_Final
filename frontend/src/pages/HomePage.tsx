@@ -19,7 +19,7 @@ const HomePage = () => {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8 mb-8">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 hover:border-primary/20" onClick={() => navigate('/simulator')}>
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer border-2 hover:border-secondary/20" onClick={() => navigate('/simulator')}>
             <CardHeader className="text-center">
               <div className="mx-auto p-3 bg-primary/10 rounded-full w-fit mb-4">
                 <Calculator className="h-8 w-8 text-primary" />
@@ -30,8 +30,6 @@ const HomePage = () => {
               <p className="text-muted-foreground">
               <br/>
               <br/>
-
-
                 Design and simulate hydraulic press systems with custom parameters, analyze performance, and get AI diagnostics.
               <br/>
               <br/>

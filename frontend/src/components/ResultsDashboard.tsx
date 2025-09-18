@@ -32,6 +32,7 @@ export interface HydraulicResults {
       workingCycle: number;
       holding: number;
       fastUp: number;
+      idle : number;
     };
   };
   
@@ -39,10 +40,12 @@ export interface HydraulicResults {
   energyConsumption: {
     total: number;             // kWh per cycle
     perPhase: {
+      
       fastDown: number;
       workingCycle: number;
       holding: number;
       fastUp: number;
+      idle: number;
     };
   };
 }
@@ -215,12 +218,12 @@ export const ResultsDashboard = ({ results, isCalculating }: ResultsDashboardPro
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <Zap className="h-5 w-5 text-warning" />
-              Moter Energy Consumption
+              Motor Energy Consumption
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-              <div className="text-center p-4 bg-muted/50 rounded-lg">
+              <div className="text-center p-4 bg-muted/50 rounded-lg ">
                 <div className="text-2xl font-bold text-foreground">
                   {results.energyConsumption.total.toFixed(3)}
                 </div>
@@ -251,7 +254,7 @@ export const ResultsDashboard = ({ results, isCalculating }: ResultsDashboardPro
           <CardHeader>
             <CardTitle className="text-lg font-semibold flex items-center gap-2">
               <Zap className="h-5 w-5 text-warning" />
-              Moter Energy Efficiency
+              Motor Energy Efficiency
             </CardTitle>
           </CardHeader>
           <CardContent>

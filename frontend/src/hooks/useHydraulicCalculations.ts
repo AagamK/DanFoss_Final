@@ -95,7 +95,8 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
       const powerFastDownMotor = powerFastDownPump / parameters.pumpEfficiency;
       const powerWorkingCyclePump = (pressureWorkingCycle * flowWorkingCycle) / 600;
       const powerWorkingCycleMotor = powerWorkingCyclePump / parameters.pumpEfficiency;
-      const powerHoldingMotor = 0; 
+      const powerHoldingMotor = (pressureWorkingCycle * flowWorkingCycle) / 600;; 
+      const powerIdle = (pressureWorkingCycle * flowWorkingCycle) / 600;;
       const powerFastUpPump = (pressureFastUp * flowFastUp) / 600;
       const powerFastUpMotor = powerFastUpPump / parameters.pumpEfficiency;
       
@@ -118,16 +119,18 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
       const energyWorkingCycle = powerWorkingCycleMotor * (parameters.phases.workingCycle.time );
       const energyHolding = powerHoldingMotor * (parameters.phases.holding.time );
       const energyFastUp = powerFastUpMotor * (parameters.phases.fastUp.time );
-      const totalEnergy = energyFastDown + energyWorkingCycle + energyHolding + energyFastUp;
+      const energyIdle = powerHoldingMotor * 4 ;
+      const totalEnergy = energyFastDown + energyWorkingCycle + energyHolding + energyFastUp + energyIdle;
 
       const effFastDown = (actuatorPowerFastDown / powerFastDownMotor) *100;
       const effWorking = (actuatorPowerWorking / powerWorkingCycleMotor) *100;
       const effHolding = 0;
       const effFastUp = (actuatorPowerFastUp / powerFastUpMotor) *100;
+      const effIdle = 0 ;
       const totalEff = ((totalEnergy > 0) ? ((actuatorPowerFastDown * parameters.phases.fastDown.time + actuatorPowerWorking * parameters.phases.workingCycle.time + actuatorPowerFastUp * parameters.phases.fastUp.time) / totalEnergy) : 0) *100;
 
-      const totalActuatorOpPower = actuatorPowerFastDown * parameters.phases.fastDown.time + actuatorPowerWorking * parameters.phases.workingCycle.time + actuatorPowerFastUp * parameters.phases.fastUp.time ;
-      const totalPumpOpPower = (powerFastDownPump * parameters.phases.fastDown.time + powerWorkingCyclePump * parameters.phases.workingCycle.time + powerFastUpPump * parameters.phases.fastUp.time );
+      const totalActuatorOpPower = actuatorPowerFastDown  + actuatorPowerWorking  + actuatorPowerFastUp  ;
+      const totalPumpOpPower = (powerFastDownPump + powerWorkingCyclePump  + powerFastUpPump  + powerHoldingMotor+ powerIdle) ;
       const overEff = parameters.pumpEfficiency * ( totalActuatorOpPower / totalPumpOpPower) *100;
 
 
@@ -276,8 +279,8 @@ export const useHydraulicCalculations = (parameters: HydraulicParameters) => {
         requiredPressure: { fastDown: pressureFastDown, workingCycle: pressureWorkingCycle, holding: pressureHolding, fastUp: pressureFastUp },
         motorPower: maxMotorPower, maxReliefValve: reliefValvePressure,
         overallEfficiencyOp: overEff,
-        energyeff:{total: totalEff, perPhase: { fastDown: effFastDown, workingCycle: effWorking, holding: effHolding, fastUp: effFastUp }},
-        energyConsumption: { total: totalEnergy, perPhase: { fastDown: energyFastDown, workingCycle: energyWorkingCycle, holding: energyHolding, fastUp: energyFastUp } }
+        energyeff:{total: totalEff, perPhase: {idle: effIdle, fastDown: effFastDown, workingCycle: effWorking, holding: effHolding, fastUp: effFastUp }},
+        energyConsumption: { total: totalEnergy, perPhase: {idle:energyIdle , fastDown: energyFastDown, workingCycle: energyWorkingCycle, holding: energyHolding, fastUp: energyFastUp } }
       };
       
       setResults(calculatedResults);

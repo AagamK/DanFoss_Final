@@ -120,7 +120,7 @@ export const AIAdvisor = ({ simulationData, onPrediction }: AIAdvisorProps) => {
                     <div className="flex items-center gap-2"><BarChart2 className="h-5 w-5" /><CardTitle className="text-lg">System Condition: {prediction.label}</CardTitle></div>
                      <div className="flex items-center gap-2">
                         {/* <Badge className={`${getSeverityStyling(prediction.severity).badge} text-white`}>{prediction.severity.toUpperCase()}</Badge> */}
-                        <Badge variant="outline">{Math.round(parseFloat(prediction.confidence) * 100)}% confidence</Badge>
+                        {/* <Badge variant="outline">{Math.round(parseFloat(prediction.confidence) * 100)}% confidence</Badge> */}
                      </div>
                 </div>
             </CardHeader>

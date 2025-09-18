@@ -1,7 +1,6 @@
-import { useState, useEffect, useCallback } from "react"; // <-- Added useCallback
+import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-// --- CHANGE 1: Imported 'Sheet' icon ---
 import { Calculator, ArrowLeft, BarChart3, Settings, Brain, GitCompare, FileDown, Sheet } from "lucide-react";
 import { ParameterForm, HydraulicParameters } from "@/components/ParameterForm";
 import { ResultsDashboard } from "@/components/ResultsDashboard";
@@ -9,19 +8,16 @@ import { SimulationGraphs } from "@/components/SimulationGraphs";
 import { useHydraulicCalculations } from "@/hooks/useHydraulicCalculations";
 import { useNavigate } from "react-router-dom";
 import { toast } from "@/components/ui/sonner";
+// **FIX**: Both imports now correctly use curly braces for named imports
 import { AIEfficiencyTab } from "@/components/AIEfficiencyTab";
 import { AIAdvisor } from "@/components/AIAdvisor";
 import type { PredictionResponse } from "@/types/predictions";
 import { CompareView } from "@/components/CompareView";
 import type { EnhancedSensorData } from "@/types/hydraulicData";
-
 import { svgAsPngUri } from 'save-svg-as-png';
 import { usePDF } from '@react-pdf/renderer';
 import { SimulationReport } from './SimulationReport';
-
-// --- CHANGE 2: Import our new CSV downloader ---
 import { downloadDataAsCSV } from "@/lib/utils";
-
 
 const defaultParameters: HydraulicParameters = {
   cylinderBore: 75,
@@ -67,21 +63,17 @@ export const HydraulicSimulator = () => {
   const navigate = useNavigate();
   const [parameters, setParameters] = useState<HydraulicParameters>(defaultParameters);
   const [activeTab, setActiveTab] = useState("parameters");
-  
   const { results, idealSimulationData, actualSimulationData, isCalculating, runSimulation, error } = useHydraulicCalculations(parameters);
-  
   const [prediction, setPrediction] = useState<PredictionResponse | null>(null);
   const [comparisonData, setComparisonData] = useState<ComparisonDataPoint[]>([]);
   const [isExporting, setIsExporting] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
-
   const [pdfInstance, updatePdfInstance] = usePDF({
     document: <SimulationReport results={{}} parameters={defaultParameters} graphImages={[]} />,
   });
 
   useEffect(() => { if (error) { toast.error("Simulation Failed", { description: error }); } }, [error]);
 
-  // This effect correctly calculates the Comparison data (unchanged)
   useEffect(() => {
     if (actualSimulationData && actualSimulationData.length > 0) {
       const { phases, cylinderBore, rodDiameter, deadLoad, holdingLoad } = parameters;
@@ -135,10 +127,9 @@ export const HydraulicSimulator = () => {
         return { idealPosition: Math.max(0, idealPos), idealVelocity: idealVel, idealPressure: idealPres, idealFlow: idealFlow, idealPower: idealPower };
       };
       
-      const processedData = actualSimulationData.map((dataPoint: EnhancedSensorData, index: number) => {
+      const processedData = actualSimulationData.map((dataPoint: EnhancedSensorData) => {
         const ideal = getIdealMetrics(dataPoint.time);
-        let actualVelocity = dataPoint.velocity; // Use the velocity from the hook
-        const actual = { actualPosition: dataPoint.stroke, actualVelocity: actualVelocity, actualPressure: dataPoint.pressure_cap, actualFlow: dataPoint.flow, actualPower: dataPoint.actuatorOutputPower };
+        const actual = { actualPosition: dataPoint.stroke, actualVelocity: dataPoint.velocity, actualPressure: dataPoint.pressure_cap, actualFlow: dataPoint.flow, actualPower: dataPoint.actuatorOutputPower };
         
         return {
           time: dataPoint.time, ...ideal, ...actual,
@@ -149,7 +140,7 @@ export const HydraulicSimulator = () => {
       });
       setComparisonData(processedData);
     }
-  }, [actualSimulationData, parameters]); // Dependency is correct
+  }, [actualSimulationData, parameters]);
 
   const handleRunSimulation = () => {
     setPrediction(null); 
@@ -158,7 +149,6 @@ export const HydraulicSimulator = () => {
     setActiveTab("results");
   };
 
-  // PDF Export logic (unchanged)
   useEffect(() => {
     if (!isExporting || !pdfInstance.url) return;
     const link = document.createElement('a');
@@ -186,7 +176,7 @@ export const HydraulicSimulator = () => {
         svgAsPngUri(svg, { scale: 2, backgroundColor: '#FFFFFF' })
       );
       graphImageUris = await Promise.all(conversionPromises);
-    } catch (err: any) { // Type 'any' for unknown error structure
+    } catch (err: any) {
       console.error(err);
       toast.error("Graph Conversion Failed", { description: err.message });
       setIsExporting(false);
@@ -203,23 +193,19 @@ export const HydraulicSimulator = () => {
     );
   };
 
-  // --- CHANGE 3: Add new handler functions for CSV export ---
-  
   const handleExportIdealCSV = useCallback(() => {
     toast.info("Exporting Ideal Data CSV...");
     downloadDataAsCSV(idealSimulationData, "ideal_simulation_data.csv");
-  }, [idealSimulationData]); // Depends on the ideal data
+  }, [idealSimulationData]);
 
   const handleExportActualCSV = useCallback(() => {
     toast.info("Exporting Actual Data CSV...");
     downloadDataAsCSV(actualSimulationData, "actual_simulation_data.csv");
-  }, [actualSimulationData]); // Depends on the actual data
-
+  }, [actualSimulationData]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background to-secondary/20">
       <div className="container mx-auto p-6 max-w-7xl">
-        {/* Header (unchanged) */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-4">
             <Button variant="outline" onClick={() => navigate('/')}>
@@ -244,15 +230,13 @@ export const HydraulicSimulator = () => {
                 <FileDown className="h-4 w-4 mr-2" />
                 {isExporting ? "Generating PDF..." : "Export PDF Report"}
               </Button>
-
-              {/* --- CHANGE 4: Add the two new buttons --- */}
               <Button
                 variant="outline"
                 onClick={handleExportIdealCSV}
                 disabled={isCalculating || idealSimulationData.length === 0}
               >
                 <Sheet className="h-4 w-4 mr-2" />
-                Export Ideal CSV (Graphs)
+                Export Ideal CSV
               </Button>
               <Button
                 variant="outline"
@@ -260,14 +244,12 @@ export const HydraulicSimulator = () => {
                 disabled={isCalculating || actualSimulationData.length === 0}
               >
                 <Sheet className="h-4 w-4 mr-2" />
-                Export Actual CSV (Compare)
+                Export Actual CSV
               </Button>
-
             </div>
           </div>
         </div>
 
-        {/* Tabs layout (correctly routing ideal/actual data) */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full mt-8">
           <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="parameters"><Settings className="h-4 w-4 mr-2" />Parameters</TabsTrigger>
@@ -305,7 +287,6 @@ export const HydraulicSimulator = () => {
         </Tabs>
       </div>
 
-      {/* Hidden portal (correctly using actualSimulationData) */}
       {isCapturing && (
         <div
           id="capture-portal"

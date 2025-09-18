@@ -286,11 +286,11 @@ export const HydraulicCalculator = () => {
                             {/* Outputs Column */}
                             <div className="space-y-4 rounded-lg bg-muted p-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="cyl-force-ext">Force Extend (kN)</Label>
+                                    <Label htmlFor="cyl-force-ext">Bore Force (kN)</Label>
                                     <Input id="cyl-force-ext" value={cylForceExt} readOnly className="font-bold text-primary" />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="cyl-force-ret">Force Retract (kN)</Label>
+                                    <Label htmlFor="cyl-force-ret">Rod Force (kN)</Label>
                                     <Input id="cyl-force-ret" value={cylForceRet} readOnly className="font-bold text-primary" />
                                 </div>
                                 <div className="space-y-2">
